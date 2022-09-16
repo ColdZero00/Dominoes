@@ -1,0 +1,243 @@
+# Imports:
+from random import randint, shuffle
+
+# Functions:
+def generate_set(domino_set):
+    for i in range(7):
+        for j in range(i, 7):
+            domino_set.append([i, j])
+    return domino_set
+
+def shuffle_set():
+    global domino_set
+    global player_pieces
+    global computer_pieces
+    domino_set = domino_set + player_pieces + computer_pieces
+    shuffle(domino_set)
+    player_pieces, computer_pieces = [], []
+    for i in range(7):
+        player_pieces.append(domino_set.pop(randint(0, 27-2*i)))
+        computer_pieces.append(domino_set.pop(randint(0, 27-2*i-1)))
+
+def find_double():
+    p_index = -1
+    p_temp = [0,0]
+    c_index = -1
+    c_temp = [0,0]
+    global status
+    global snake
+    global loop
+    for i in range(7):
+        if player_pieces[i][0] == player_pieces[i][1]:
+            if p_temp <= player_pieces[i]:
+                p_index = i
+                p_temp = player_pieces[i]
+        if computer_pieces[i][0] == computer_pieces[i][1]:
+            if c_temp <= computer_pieces[i]:
+                c_index = i
+                c_temp = computer_pieces[i]
+    if p_index == -1 and c_index == -1:
+        loop = True
+    elif c_temp > p_temp:
+        snake.append(computer_pieces.pop(c_index))
+        status = 'player'
+        loop = False
+    else:
+        snake.append(player_pieces.pop(p_index))
+        status = 'computer'
+        loop = False
+
+def printer2():
+    print('='*70)
+    print('Stock size:', len(domino_set))
+    print('Computer pieces:', len(computer_pieces),'\n')
+    if len(snake) <= 6:
+        for i in snake:
+            print(i, sep='', end='')
+    else:
+        for i in snake[:3]:
+            print(i, sep='', end='')
+        print('...', sep='',end='')
+        for i in snake[-3:]:
+            print(i, sep='', end='')
+    print('\n\nYour pieces:')
+    for i in range((len(player_pieces))):
+        print(i+1,':', player_pieces[i], sep = '')
+
+def nomove_check():
+    if domino_set == []:
+        for piece in player_pieces:
+            if snake[0][0] in piece or snake[-1][1] in piece:
+                return False
+        return True
+    else:
+        return False
+
+def status_printer():
+    if player_pieces == []:
+        print('\nStatus: The game is over. You won!')
+    elif computer_pieces == []:
+        print('\nStatus: The game is over. The computer won!')
+    elif fish_check(snake) or nomove_check():
+        print("\nStatus: The game is over. It's a draw!")
+    elif status == 'computer':
+        print('\nStatus: Computer is about to make a move. Press Enter to continue...')
+    elif status == 'player':
+        print('\nStatus: It\'s your turn to make a move. Enter your command.')
+
+def make_move(move, pieces):
+    global snake
+    if move > 0:
+        stack = orientation(pieces.pop(move-1), 1)
+        snake = snake + [stack]
+    elif move == 0 and domino_set != []:
+        pieces.append(domino_set.pop(randint(0,len(domino_set)-1)))
+    elif move < 0:
+        stack = orientation(pieces.pop(abs(move)-1), -1)
+        snake = [stack] + snake
+    return pieces
+
+def get_response():
+    global player_pieces
+    global quit
+    while True:
+        try:
+            response = input()
+            response = int(response)
+            if abs(response)-1 < len(player_pieces) or response == 0:
+                if rule_check(response, player_pieces):
+                    return response
+                else:
+                    print('Illegal move. Please try again.')
+            else:
+                print('Invalid input. Please try again.')
+        except:
+            print('Invalid input. Please try again.')
+
+def computer_response():
+    global computer_pieces
+    input()
+    response = 404
+    smart_set = ai(computer_pieces)
+    negative = False
+    while not rule_check(response, computer_pieces):
+        if smart_set != []:
+            if not negative:
+                response = computer_pieces.index(smart_set.pop(0)) + 1
+                negative = True
+            else:
+                response = -response
+                negative = False
+        else:
+            response = 0
+    return response
+
+def ai(x):
+    global snake
+    smart_set = []
+    for i,j in x:
+        smart_set.append([i,j])
+    counter = {i:0 for i in range(7)}
+    for stack1, stack2 in smart_set + snake:
+        counter[stack1] += 1
+        counter[stack2] += 1
+    rating = {}
+    for i in range(len(smart_set)):
+        rating[i] = counter[smart_set[i][0]] + counter[smart_set[i][1]]
+    for i in range(len(smart_set)-1):
+        for j in range(len(smart_set)-i-1):
+            if rating[j] < rating[j+1]:
+                rating[j], rating[j+1] = rating[j+1], rating[j]
+                smart_set[j], smart_set[j+1] = smart_set[j+1], smart_set[j]
+    return smart_set
+
+def endgame_check():
+    global snake
+    global quit
+    if player_pieces == []:
+        return False
+    elif computer_pieces == []:
+        return False
+    elif fish_check(snake):
+        return False
+    elif quit:
+        print('Exit')
+        return False
+    else:
+        return True
+
+def fish_check(snake):
+    global domino_set
+    if domino_set == []:
+        return False
+    if snake[0][0] == snake[-1][-1]:
+        counter = 0
+        for i in range(len(snake)):
+            if snake[i][0] == snake[0][0]:
+                counter += 1
+            if snake[i][1] == snake[0][0]:
+                counter += 1
+        if counter == 8:
+            return True
+        else:
+            return False
+    else:
+        return False
+
+def rule_check(response, pieces):
+    global snake
+    if response == 404:
+        return False
+    if response == 0:
+        return True
+    elif response > 0:
+        if snake[-1][1] in pieces[response-1]:
+            return True
+        else:
+            return False
+    else:
+        if snake[0][0] in pieces[abs(response)-1]:
+            return True
+        else:
+            return False
+
+def orientation(stack, i):
+    global snake
+    if i > 0:
+        if snake[-1][1] == stack[0]:
+            return stack
+        else:
+            return stack[::-1]
+    else:
+        if snake[0][0] == stack[1]:
+            return stack
+        else:
+            return stack[::-1]
+
+
+
+# Main function:
+domino_set = []
+player_pieces = []
+computer_pieces = []
+snake = []
+status = ''
+domino_set = generate_set(domino_set)
+loop = True
+quit = False
+while loop:
+    shuffle_set()
+    find_double()
+printer2()
+status_printer()
+while endgame_check():
+    if status == 'computer':
+        move = computer_response()
+        computer_pieces = make_move(move, computer_pieces)
+        status = 'player'
+    elif status == 'player':
+        move = get_response()
+        player_pieces = make_move(move, player_pieces)
+        status = 'computer'
+    printer2()
+    status_printer()
